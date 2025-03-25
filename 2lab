@@ -1,0 +1,306 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <limits>
+
+using namespace std;
+
+// Класс для хранения данных об автомобиле
+class Car {
+public:
+    int id;             // Уникальный идентификатор автомобиля
+    string brand;       // Марка автомобиля
+    string model;       // Модель автомобиля
+    int year;           // Год выпуска
+    string licensePlate; // Номерной знак
+
+    Car(int id = 0, string brand = "", string model = "", int year = 0, string licensePlate = "")
+        : id(id), brand(brand), model(model), year(year), licensePlate(licensePlate) {}
+
+    // Метод для проверки, является ли ячейка пустой
+    bool isEmpty() const {
+        return id == 0 && brand.empty() && model.empty() && year == 0 && licensePlate.empty();
+    }
+
+    // Метод для очистки данных в ячейке
+    void clear() {
+        id = 0;
+        brand.clear();
+        model.clear();
+        year = 0;
+        licensePlate.clear();
+    }
+};
+
+// Класс хэш-таблицы с двойным хэшированием
+class HashTable {
+private:
+    vector<Car> table;  // Вектор для хранения данных
+    int capacity;       // Вместимость таблицы
+    int size;          // Текущее количество элементов
+
+    // Первая хэш-функция
+    int hash1(int id) const {
+        return id % capacity;
+    }
+
+    // Вторая хэш-функция (должна быть не равна 0 и взаимно проста с capacity)
+    int hash2(int id) const {
+        return 1 + (id % (capacity - 1));
+    }
+
+    // Вспомогательная функция для проверки, является ли число простым
+    bool isPrime(int n) const {
+        if (n <= 1) return false;
+        if (n <= 3) return true;
+        if (n % 2 == 0 || n % 3 == 0) return false;
+        for (int i = 5; i * i <= n; i += 6) {
+            if (n % i == 0 || n % (i + 2) == 0)
+                return false;
+        }
+        return true;
+    }
+
+    // Функция для нахождения следующего простого числа после n
+    int nextPrime(int n) const {
+        if (n <= 1) return 2;
+        int prime = n;
+        bool found = false;
+        while (!found) {
+            prime++;
+            if (isPrime(prime))
+                found = true;
+        }
+        return prime;
+    }
+
+    // Рехэширование таблицы при необходимости
+    void rehash() {
+        int oldCapacity = capacity;
+        capacity = nextPrime(2 * oldCapacity);
+        vector<Car> oldTable = table;
+        table.clear();
+        table.resize(capacity);
+        size = 0;
+
+        for (int i = 0; i < oldCapacity; ++i) {
+            if (!oldTable[i].isEmpty()) {
+                insert(oldTable[i]);
+            }
+        }
+    }
+
+public:
+    // Конструктор
+    HashTable(int initialCapacity = 10) : size(0) {
+        capacity = isPrime(initialCapacity) ? initialCapacity : nextPrime(initialCapacity);
+        table.resize(capacity);
+    }
+
+    // Метод вставки элемента
+    void insert(const Car& car) {
+        if (size >= capacity / 2) {
+            rehash();
+        }
+
+        int index = hash1(car.id);
+        int step = hash2(car.id);
+        int attempts = 0;
+
+        while (attempts < capacity) {
+            if (table[index].isEmpty() || table[index].id == car.id) {
+                if (table[index].isEmpty()) {
+                    size++;
+                }
+                table[index] = car;
+                return;
+            }
+            index = (index + step) % capacity;
+            attempts++;
+        }
+
+        // Если не нашли место после capacity попыток, делаем рехэширование и пробуем снова
+        rehash();
+        insert(car);
+    }
+
+    // Метод поиска элемента
+    Car* search(int id) {
+        int index = hash1(id);
+        int step = hash2(id);
+        int attempts = 0;
+
+        while (attempts < capacity) {
+            if (table[index].id == id) {
+                return &table[index];
+            }
+            if (table[index].isEmpty()) {
+                return nullptr;
+            }
+            index = (index + step) % capacity;
+            attempts++;
+        }
+
+        return nullptr;
+    }
+
+    // Метод удаления элемента
+    bool remove(int id) {
+        int index = hash1(id);
+        int step = hash2(id);
+        int attempts = 0;
+
+        while (attempts < capacity) {
+            if (table[index].id == id) {
+                table[index].clear();
+                size--;
+                return true;
+            }
+            if (table[index].isEmpty()) {
+                return false;
+            }
+            index = (index + step) % capacity;
+            attempts++;
+        }
+
+        return false;
+    }
+
+    // Метод вывода хэш-таблицы
+    void print() const {
+        cout << "Hash Table (capacity: " << capacity << ", size: " << size << "):\n";
+        for (int i = 0; i < capacity; ++i) {
+            cout << "[" << i << "]: ";
+            if (table[i].isEmpty()) {
+                cout << "empty";
+            }
+            else {
+                cout << "ID: " << table[i].id << ", Brand: " << table[i].brand
+                    << ", Model: " << table[i].model << ", Year: " << table[i].year
+                    << ", License Plate: " << table[i].licensePlate;
+            }
+            cout << endl;
+        }
+    }
+
+    // Метод для получения текущего размера таблицы
+    int getSize() const {
+        return size;
+    }
+
+    // Метод для получения вместимости таблицы
+    int getCapacity() const {
+        return capacity;
+    }
+};
+
+// Функция для ввода автомобиля с консоли
+Car inputCar() {
+    Car car;
+    cout << "\nEnter car details:\n";
+
+    cout << "ID (number): ";
+    while (!(cin >> car.id)) {
+        cout << "Invalid input. Please enter a number for ID: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    cin.ignore(); // Очищаем буфер после ввода числа
+
+    cout << "Brand: ";
+    getline(cin, car.brand);
+
+    cout << "Model: ";
+    getline(cin, car.model);
+
+    cout << "Year: ";
+    while (!(cin >> car.year)) {
+        cout << "Invalid input. Please enter a number for year: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    cin.ignore();
+
+    cout << "License Plate: ";
+    getline(cin, car.licensePlate);
+
+    return car;
+}
+
+int main() {
+    HashTable carTable(5);
+    int choice;
+
+    do {
+        cout << "\nCar Database Menu:\n";
+        cout << "1. Add a car\n";
+        cout << "2. Search for a car\n";
+        cout << "3. Remove a car\n";
+        cout << "4. Display all cars\n";
+        cout << "5. Exit\n";
+        cout << "Enter your choice: ";
+
+        while (!(cin >> choice) || choice < 1 || choice > 5) {
+            cout << "Invalid input. Please enter a number between 1 and 5: ";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
+
+        switch (choice) {
+        case 1: {
+            Car car = inputCar();
+            carTable.insert(car);
+            cout << "Car added successfully!\n";
+            break;
+        }
+        case 2: {
+            int id;
+            cout << "Enter ID to search: ";
+            while (!(cin >> id)) {
+                cout << "Invalid input. Please enter a number for ID: ";
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            }
+
+            Car* foundCar = carTable.search(id);
+            if (foundCar) {
+                cout << "\nCar found:\n";
+                cout << "ID: " << foundCar->id << endl;
+                cout << "Brand: " << foundCar->brand << endl;
+                cout << "Model: " << foundCar->model << endl;
+                cout << "Year: " << foundCar->year << endl;
+                cout << "License Plate: " << foundCar->licensePlate << endl;
+            }
+            else {
+                cout << "Car with ID " << id << " not found.\n";
+            }
+            break;
+        }
+        case 3: {
+            int id;
+            cout << "Enter ID to remove: ";
+            while (!(cin >> id)) {
+                cout << "Invalid input. Please enter a number for ID: ";
+                cin.clear();
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            }
+
+            if (carTable.remove(id)) {
+                cout << "Car with ID " << id << " removed successfully.\n";
+            }
+            else {
+                cout << "Car with ID " << id << " not found.\n";
+            }
+            break;
+        }
+        case 4:
+            carTable.print();
+            break;
+        case 5:
+            cout << "Exiting...\n";
+            break;
+        }
+    } while (choice != 5);
+
+    return 0;
+}
